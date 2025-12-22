@@ -177,20 +177,25 @@ async function processTiles() {
   log('Starting offer enrollment');
   await autoScrollToLoadAllOffers();
 
-  const tiles = Array.from(document.querySelectorAll('.tile-content')).filter(
-    (tile) => !isAlreadyEnrolled(tile)
+  const allTiles = Array.from(document.querySelectorAll('.tile-content'));
+
+  const enrolledCount = allTiles.filter(isAlreadyEnrolled).length;
+  const unenrolledTiles = allTiles.filter((tile) => !isAlreadyEnrolled(tile));
+
+  const total = allTiles.length;
+  let current = enrolledCount;
+
+  log(
+    `Found ${total} offers (${enrolledCount} already enrolled, ${unenrolledTiles.length} remaining)`
   );
 
-  const total = tiles.length;
-  let current = 0;
+  // Initialize progress bar correctly
+  sendProgress(current, total, `Already enrolled: ${enrolledCount}/${total}`);
 
-  log(`Found ${total} offers`);
-  sendProgress(0, total, 'Starting');
-
-  for (let i = 0; i < tiles.length; i++) {
+  for (let i = 0; i < unenrolledTiles.length; i++) {
     if (!(await shouldContinue())) break;
 
-    const tile = tiles[i];
+    const tile = unenrolledTiles[i];
 
     if (isAlreadyEnrolled(tile)) {
       log(`Skipping already enrolled offer ${i + 1}`);
@@ -204,7 +209,7 @@ async function processTiles() {
     tile.dataset.processed = 'true';
     current++;
 
-    const label = describeTile(tile, i, total);
+    const label = describeTile(tile, current, total);
     log(label);
     sendProgress(current, total, label);
 

@@ -4,7 +4,32 @@ const startBtn = document.getElementById('start');
 const stopBtn = document.getElementById('stop');
 const progressBar = document.getElementById('progress-bar');
 const progressText = document.getElementById('progress-text');
+let lastKnownLabel = null;
 
+function renderState({ running, current = 0, total = 0, label }) {
+  const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+
+  progressBar.style.width = `${percent}%`;
+
+  if (label) {
+    lastKnownLabel = label;
+  }
+
+  if (lastKnownLabel) {
+    progressText.textContent = lastKnownLabel;
+    return;
+  }
+
+  if (running && total > 0) {
+    progressText.textContent = 'Processing offers…';
+  } else if (!running && current > 0 && current < total) {
+    progressText.textContent = 'Paused';
+  } else if (!running && total > 0 && current === total) {
+    progressText.textContent = 'All offers processed';
+  } else {
+    progressText.textContent = 'Idle';
+  }
+}
 
 // On popup open, read last known state
 chrome.storage.local.get(
@@ -15,24 +40,16 @@ chrome.storage.local.get(
     'autoEnrollLabel',
   ],
   (result) => {
-    const {
-      autoEnrollRunning,
-      autoEnrollCurrent,
-      autoEnrollTotal,
-      autoEnrollLabel,
-    } = result;
+    lastKnownLabel = result.autoEnrollLabel || null;
 
-    const percent =
-      autoEnrollTotal && autoEnrollTotal > 0
-        ? Math.round((autoEnrollCurrent / autoEnrollTotal) * 100)
-        : 0;
-
-    progressBar.style.width = `${percent}%`;
-    progressText.textContent =
-      autoEnrollLabel || (autoEnrollRunning ? 'Running...' : 'Idle');
+    renderState({
+      running: result.autoEnrollRunning,
+      current: result.autoEnrollCurrent,
+      total: result.autoEnrollTotal,
+      label: result.autoEnrollLabel,
+    });
   }
 );
-
 
 async function ensureTargetTab() {
   if (!targetTabId) {
@@ -56,35 +73,23 @@ function setRunningState(isRunning) {
 
 startBtn.addEventListener('click', async () => {
   await ensureTargetTab();
-
   setRunningState(true);
   sendToTarget('START_ENROLLING');
-
-  progressText.textContent = 'Starting...';
 });
 
 stopBtn.addEventListener('click', () => {
   setRunningState(false);
   sendToTarget('STOP_ENROLLING');
-
-  progressText.textContent = 'Stopped';
-  progressBar.style.width = '0%';
 });
 
 // Receive progress updates from content.js
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'PROGRESS') {
-    const percent =
-      message.total === 0
-        ? 0
-        : Math.round((message.current / message.total) * 100);
-
-    progressBar.style.width = `${percent}%`;
-    progressText.textContent =
-      message.label || `${message.current} / ${message.total} offers`;
-  }
-
-  if (message.type === 'DONE') {
-    progressText.textContent = 'Completed';
+    renderState({
+      running: true,
+      current: message.current,
+      total: message.total,
+      label: message.label,
+    });
   }
 });
