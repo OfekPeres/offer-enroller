@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Offer Enroller",
-  "version": "1.0",
+  "version": "1.0.0",
   "description": "Manually enrolls in merchant offers.",
   "permissions": ["activeTab", "storage"],
   "action": {
